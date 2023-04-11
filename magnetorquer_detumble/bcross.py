@@ -35,13 +35,19 @@ class Controller:
         Optimal gain for bcross_control, according to eq 30 in Avanzini and Giulietti 2012.
         We assume the Earth's magnetic dipole is aligned with its poles, 
         so the magnetic inclination == the orbit inclination
+
+        :param semi_major_axis: The semi-major axis of the orbit, units in meters (m)
+        :param inclination: The inclination of the orbit, units in radians (rad)
+        :param minimum_inertia_moment: the minimum moment of inertia of the satellite, units in kg*m^2
+
+        :return k_gain: computed gain
         """
         Jmin = minimum_inertia_moment
         Omega = 1 / np.sqrt(semi_major_axis**3 / GM_EARTH)
         xi_m = inclination
 
-        k_bcross = 2 * Omega * (1 + np.sin(xi_m)) * Jmin  # equation 30
-        return k_bcross
+        k_gain = 2 * Omega * (1 + np.sin(xi_m)) * Jmin  # equation 30
+        return k_gain
 
     def _bcross_control(self, angular_rate, magnetic_vector_body, k_gain=None):
         """ bcross_control(x, epc)
