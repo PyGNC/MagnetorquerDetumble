@@ -43,7 +43,7 @@ class Controller:
         self.output_range = np.array(output_range)
 
     @staticmethod
-    def _compute_minimum_inertia_moment(inertia_matrix):
+    def compute_minimum_inertia_moment(inertia_matrix):
         """
         Given an inertia matrix, compute the minimum moment of inertia.
         This is the minimum eigenvalue of the inertia matrix.

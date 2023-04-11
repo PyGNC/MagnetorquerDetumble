@@ -21,7 +21,7 @@ class TestBCross(unittest.TestCase):
 
     def test_minimum_inertia_1(self):
         J = np.eye(3)
-        Jmin = magnetorquer_detumble.bcross.Controller._compute_minimum_inertia_moment(J)
+        Jmin = magnetorquer_detumble.bcross.Controller.compute_minimum_inertia_moment(J)
         self.assertAlmostEqual(Jmin, 1.0)
 
     def test_minimum_inertia_2(self):
@@ -30,7 +30,7 @@ class TestBCross(unittest.TestCase):
             [-0.00114518,    0.0945149,  6.5994e-6],
             [0.000315221,   6.5994e-6,  0.0989731]
         ])
-        Jmin = magnetorquer_detumble.bcross.Controller._compute_minimum_inertia_moment(J)
+        Jmin = magnetorquer_detumble.bcross.Controller.compute_minimum_inertia_moment(J)
         self.assertGreater(Jmin, 0.0)
         self.assertLess(Jmin, 1.0)
 
