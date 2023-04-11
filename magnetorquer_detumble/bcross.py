@@ -22,6 +22,16 @@ class Controller:
                  maximum_dipoles,
                  output_range,
                  k_gain=None):
+        """
+        Set up the constant parameters for the B-Cross controller.
+
+        :param semi_major_axis: The semi-major axis of the orbit, units in meters (m)
+        :param inclination: The inclination of the orbit, units in radians (rad)
+        :param minimum_inertia_moment: the minimum moment of inertia of the satellite, units in kg*m^2
+        :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
+        :param output_range: the maximum output values to rescale the control dipole to
+        :param k_gain: the controller gain parameter, leave as None for "optimal" default
+        """
 
         if k_gain is None:
             # default to optimal gain
@@ -34,6 +44,13 @@ class Controller:
 
     @staticmethod
     def _compute_minimum_inertia_moment(inertia_matrix):
+        """
+        Given an inertia matrix, compute the minimum moment of inertia.
+        This is the minimum eigenvalue of the inertia matrix.
+
+        :param inertia_matrix: The inertia matrix for a rigid-body
+        :return: the minimum moment of inertia
+        """
         return np.min(np.linalg.eigvals(inertia_matrix))
 
     @staticmethod
@@ -83,6 +100,7 @@ class Controller:
         [-self.maximum_dipoles, self.maximum_dipoles].
 
         :param control_dipole: the raw control dipole computed by _bcross_control
+        :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
         """
         return np.clip(control_dipole, -maximum_dipoles, maximum_dipoles)
 
@@ -92,6 +110,10 @@ class Controller:
         Rescale `saturated_control_dipole` to be in the range set by self.output_range.
         The input should be saturated with `_saturate_dipole` prior to calling this function.
         The return value will be in the range [-self.output_range, self.output_range]
+
+        :param saturated_control_dipole: the saturated control dipole computed by _saturate_dipole
+        :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
+        :param output_range: the maximum output values to rescale the control dipole to
         """
         return (saturated_control_dipole / maximum_dipoles) * output_range
 
