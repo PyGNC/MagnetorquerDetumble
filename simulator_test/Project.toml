@@ -1,0 +1,5 @@
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+SatelliteDynamics = "0e7c1a32-1b9f-5532-88a4-e668712d6a4c"
+SatellitePlayground = "42def6c6-fd6a-4211-8419-600c79e00ff9"

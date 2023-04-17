@@ -14,6 +14,10 @@ q0 = [1.0, 0.0, 0.0, 0.0]
 ω0 = ω0 / norm(ω0) * deg2rad(50.0)
 x0 = SP.state_from_osc(x_osc_0, q0, ω0)
 
+py4_dipole_limits = [0.06997731147540984,
+    0.053130000000000004,
+    0.06976756111111111]
+
 py"""
 import sys
 sys.path.insert(0, "..")
@@ -27,10 +31,6 @@ Detumble = Controller(
     py4_dipole_limits,
     py4_dipole_limits
 )
-
-py4_dipole_limits = [0.06997731147540984,
-    0.053130000000000004,
-    0.06976756111111111]
 
 function control_law(measurement, t)
     (state, params) = measurement
