@@ -51,7 +51,7 @@ class Controller:
         :param inertia_matrix: The inertia matrix for a rigid-body
         :return: the minimum moment of inertia
         """
-        return np.min(np.linalg.eigvals(inertia_matrix))
+        return np.min(np.linalg.eig(inertia_matrix)[1])
 
     @staticmethod
     def _bcross_gain(semi_major_axis, inclination, minimum_inertia_moment):
