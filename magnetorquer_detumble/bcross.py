@@ -6,6 +6,31 @@ except:
 GM_EARTH = 3.986004415e14  # TODO: move this to a constants repository
 
 
+class PracticalController:
+    """
+    Practical implementation of the B-Cross detumble controller.
+
+    * Accounts for the magnetic torque coils saturating the magnetometer
+    * Does not use linear feedback, instead just saturates the control dipole
+    """
+
+    def __init__(self, maximum_dipoles, output_range) -> None:
+        self.output_range = np.array(output_range)
+        self.maximum_dipoles = np.array(maximum_dipoles)
+        pass
+
+    @staticmethod
+    def get_control(maximum_dipoles, output_range, angular_rate_body, magnetic_vector_body):
+        k = 1  # Doesn't matter, we're just saturating
+        control_dipole = Controller._bcross_control(
+            angular_rate_body, magnetic_vector_body, k)
+        scale_factor = np.min(np.abs(maximum_dipoles / control_dipole))
+        control_dipole *= scale_factor
+
+        return Controller._scale_dipole(control_dipole, maximum_dipoles, output_range)
+
+
+
 class Controller:
     """
     Implementation of the B-Cross detumble controller
@@ -21,8 +46,7 @@ class Controller:
                  minimum_inertia_moment,
                  maximum_dipoles,
                  output_range,
-                 k_gain=None,
-                 always_saturate=False):
+                 k_gain=None):
         """
         Set up the constant parameters for the B-Cross controller.
 
@@ -32,16 +56,12 @@ class Controller:
         :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
         :param output_range: the maximum output values to rescale the control dipole to
         :param k_gain: the controller gain parameter, leave as None for "optimal" default
-        :param always_saturate: if True, the controller will always saturate the control dipole to the maximum dipole value that maintains the direction of the dipole
         """
-
-        self.always_saturate = always_saturate
-        if always_saturate:
-            self.k_gain = 1
 
         if k_gain is None:
             # default to optimal gain
-            self.k_gain = self._bcross_gain(semi_major_axis, inclination, minimum_inertia_moment)
+            self.k_gain = self._bcross_gain(
+                semi_major_axis, inclination, minimum_inertia_moment)
         else:
             self.k_gain = k_gain
 
@@ -100,18 +120,14 @@ class Controller:
         return control_dipole
 
     @staticmethod
-    def _saturate_dipole(control_dipole, maximum_dipoles, always_saturate):
+    def _saturate_dipole(control_dipole, maximum_dipoles):
         """
         Clip the minimum and maximum values of `control_dipole` to be in the range
         [-self.maximum_dipoles, self.maximum_dipoles].
 
         :param control_dipole: the raw control dipole computed by _bcross_control
         :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
-        :param always_saturate: if True, the controller will always saturate the control dipole to the maximum dipole value that maintains the direction of the dipole
         """
-        if always_saturate:
-            scale_factor = np.min(np.abs(maximum_dipoles / control_dipole))
-            return control_dipole * scale_factor
         return np.clip(control_dipole, -maximum_dipoles, maximum_dipoles)
 
     @staticmethod
@@ -137,7 +153,10 @@ class Controller:
 
         :return scaled_control_dipole: the computed control dipole, in the body frame, scaled to [-output_range, output_range]
         """
-        control_dipole = self._bcross_control(angular_rate_body, magnetic_vector_body, self.k_gain)
-        saturated_control_dipole = self._saturate_dipole(control_dipole, self.maximum_dipoles, self.always_saturate)
-        scaled_control_dipole = self._scale_dipole(saturated_control_dipole, self.maximum_dipoles, self.output_range)
+        control_dipole = self._bcross_control(
+            angular_rate_body, magnetic_vector_body, self.k_gain)
+        saturated_control_dipole = self._saturate_dipole(
+            control_dipole, self.maximum_dipoles)
+        scaled_control_dipole = self._scale_dipole(
+            saturated_control_dipole, self.maximum_dipoles, self.output_range)
         return scaled_control_dipole

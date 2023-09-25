@@ -61,6 +61,13 @@ class TestBCross(unittest.TestCase):
 
         ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max, False)
         np.testing.assert_array_almost_equal(ret, m)
+    
+    def test_saturate_dipole_always_saturate(self):
+        m = np.array([1, 2, 3])
+        m_max = np.array([3, 2, 1])
+
+        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max, True)
+        np.testing.assert_array_almost_equal(ret, [1/3, 2/3, 1])
 
     def test_scale_dipole_1(self):
         m = 0.1 * np.ones(3)
