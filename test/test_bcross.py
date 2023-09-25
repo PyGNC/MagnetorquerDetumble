@@ -38,28 +38,28 @@ class TestBCross(unittest.TestCase):
         m = 11.77 * np.ones(3)
         m_max = np.ones(3)
 
-        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max)
+        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max, False)
         np.testing.assert_array_almost_equal(ret, m_max)
 
     def test_saturate_dipole_2(self):
         m = -11.77 * np.ones(3)
         m_max = np.array([10, 9.99, 0.01])
 
-        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max)
+        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max, False)
         np.testing.assert_array_almost_equal(-ret, m_max)
 
     def test_saturate_dipole_3(self):
         m = np.array([4.32, 0.02, -2.1, -0.99])
         m_max = np.ones(4)
 
-        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max)
+        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max, False)
         np.testing.assert_array_equal(ret, np.array([1.0, 0.02, -1.0, -0.99]))
 
     def test_saturate_dipole_4(self):
         m = np.zeros(3)
         m_max = np.ones(3)
 
-        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max)
+        ret = magnetorquer_detumble.bcross.Controller._saturate_dipole(m, m_max, False)
         np.testing.assert_array_almost_equal(ret, m)
 
     def test_scale_dipole_1(self):
