@@ -9,6 +9,7 @@ GM_EARTH = 3.986004415e14  # TODO: move this to a constants repository
 class PracticalController:
     """
     Practical implementation of the B-Cross detumble controller.
+    # TODO: figure out if this should be its own class.
 
     * Accounts for the magnetic torque coils saturating the magnetometer
     * Does not use linear feedback, instead just saturates the control dipole
