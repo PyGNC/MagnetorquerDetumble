@@ -25,13 +25,13 @@ begin
 
     env = copy(SP.default_environment)
     env.config = SP.EnvironmentConfig(
-        n_gravity=1,
-        m_gravity=1,
-        include_drag=false,
-        include_solar_radiation_pressure=false,
-        include_sun_gravity=false,
-        include_moon_gravity=false,
-        include_gravity_gradient_torque=false)
+        n_gravity=10,
+        m_gravity=10,
+        include_drag=true,
+        include_solar_radiation_pressure=true,
+        include_sun_gravity=true,
+        include_moon_gravity=true,
+        include_gravity_gradient_torque=true)
 
 end
 
