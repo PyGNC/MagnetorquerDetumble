@@ -1,2 +1,2 @@
-from .bcross import Controller
+from .bcross import Controller, PracticalController
 from .quaternions import Quaternion

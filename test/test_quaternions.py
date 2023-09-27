@@ -70,3 +70,20 @@ class TestQuaternionLibrary(unittest.TestCase):
             Quaternion.qmul(q2, q3),
             np.array([-43, 29, -21, -17])
         )
+
+    def test_rotate_vector_by_quaternion(self):
+        q1 = Quaternion.identity()
+        v = np.array([1, 2, 3])
+        np.testing.assert_array_almost_equal(
+            Quaternion.rotate_vector_by_quaternion(q1, v),
+            v
+        )
+
+    def test_qdot(self):
+        q1 = np.array([0.5, 0.5, 0, 0])
+        v1 = np.array([0.3, 0.4, 0.5])
+
+        np.testing.assert_array_almost_equal(
+            Quaternion.qdot(q1, v1),
+            np.array([-0.075, 0.075, -0.024999999999999994, 0.225])
+        )

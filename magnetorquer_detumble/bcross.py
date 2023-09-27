@@ -4,32 +4,73 @@ except:
     import numpy as np
 
 GM_EARTH = 3.986004415e14  # TODO: move this to a constants repository
+from .quaternions import Quaternion
 
 
 class PracticalController:
     """
     Practical implementation of the B-Cross detumble controller.
-    # TODO: figure out if this should be its own class.
 
     * Accounts for the magnetic torque coils saturating the magnetometer
     * Does not use linear feedback, instead just saturates the control dipole
     """
 
-    def __init__(self, maximum_dipoles, output_range) -> None:
+    def __init__(self, maximum_dipoles, output_range, sense_time=5.0, actuate_time=5.0):
         self.output_range = np.array(output_range)
         self.maximum_dipoles = np.array(maximum_dipoles)
-        pass
+        self.sense_time = sense_time
+        self.actuate_time = actuate_time
+
+        self.mode = None
+        self.timer = 0.0
 
     @staticmethod
-    def get_control(maximum_dipoles, output_range, angular_rate_body, magnetic_vector_body):
-        k = 1  # Doesn't matter, we're just saturating
+    def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body):
+        k = 1.0  # Doesn't matter, we're just saturating
         control_dipole = Controller._bcross_control(
             angular_rate_body, magnetic_vector_body, k)
         scale_factor = np.min(np.abs(maximum_dipoles / control_dipole))
-        control_dipole *= scale_factor
 
-        return Controller._scale_dipole(control_dipole, maximum_dipoles, output_range)
+        return scale_factor * control_dipole
 
+    def get_control(self, angular_rate_body, magnetic_vector_body, dt):
+        control = np.zeros(3)
+        angular_rate_body = np.array(angular_rate_body)
+        magnetic_vector_body = np.array(magnetic_vector_body)
+        dt = float(dt)
+
+        if self.mode is None:
+            self.mode = 'sense'
+            self.timer = self.sense_time
+        elif self.mode == 'sense':
+            self.timer -= dt
+
+            self.magnetic_vector = magnetic_vector_body
+            self.attitude_offset = Quaternion.identity()
+
+            if self.timer <= 0:
+                self.mode = 'actuate'
+                self.timer = self.actuate_time
+        elif self.mode == 'actuate':
+            # In this case we ignore the magnetic vector and use angular velocity to propogate the magnetic vector
+            self.timer -= dt
+
+            # self.attitude_offset = Quaternion.integrate_quaternion_with_angular_velocity(self.attitude_offset, angular_rate_body, dt)
+            propogation_matrix = np.eye(3) + Quaternion.hat(angular_rate_body * dt)
+            # print(f'\n\nattitude: {self.attitude_offset}\n\n')
+            self.magnetic_vector = np.dot(propogation_matrix.T, self.magnetic_vector)
+            # print(f'magnetic_error: {np.linalg.norm(self.magnetic_vector - magnetic_vector_body)}')
+
+            # First order approximation I + hat(omega *dt) for propogating the attitude
+
+            control = self.calculate_control(self.maximum_dipoles, angular_rate_body, self.magnetic_vector)
+            control = Controller._scale_dipole(control, self.maximum_dipoles, self.output_range)
+
+            if self.timer <= 0:
+                self.mode = 'sense'
+                self.timer = self.sense_time
+        
+        return control
 
 
 class Controller:

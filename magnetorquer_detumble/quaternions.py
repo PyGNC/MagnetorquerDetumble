@@ -66,7 +66,22 @@ class Quaternion:
         Integrate a quaternion with angular velocity w over time t.
         Normalize the quaternion after integration.
         """
-        q = np.array(q)
-        q += Quaternion.qdot(q, w) * t
+
+        dq = Quaternion.qdot(q, w) * t
+        q += dq
         q /= np.linalg.norm(q)
         return q
+
+    @staticmethod
+    def identity():
+        return np.array([1.0, 0.0, 0.0, 0.0])
+
+    @staticmethod
+    def rotate_vector_by_quaternion(q, v):
+        """
+        rotate_vector_by_quaternion(q, v)
+
+        Rotate a vector v by a quaternion q.
+        """
+
+        return np.dot(Quaternion.quaternion_to_matrix(q), v)
