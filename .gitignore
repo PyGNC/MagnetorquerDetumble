@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Julia manfiest
+simulator_test/Manifest.toml
