@@ -14,6 +14,12 @@ class PracticalController:
     """
 
     def __init__(self, maximum_dipoles, output_range, sense_time=5.0, actuate_time=5.0):
+        """
+        :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2 
+        :param output_range: the maximum output values to rescale the control dipole to
+        :param sense_time: the time taken to sense the magnetic field, while not actuating, units in seconds (s)
+        :param actuate_time: the time taken to use the magnetic torque coils, while not sensing, units in seconds (s)
+        """
         self.output_range = np.array(output_range)
         self.maximum_dipoles = np.array(maximum_dipoles)
         self.sense_time = sense_time
@@ -65,6 +71,11 @@ class PracticalController:
         return (saturated_control_dipole / maximum_dipoles) * output_range
 
     def get_control(self, angular_rate_body, magnetic_vector_body, dt):
+        """
+       :param angular_rate_body: the current angular rate in the body frame with units rad/s 
+       :param magnetic_vector_body: the current magnetic field measurement in the body frame, units in Tesla (T)
+       :param dt: the time step since the last call to get_control, units in seconds (s)
+       """
         control = np.zeros(3)
         angular_rate_body = np.array(angular_rate_body)
         magnetic_vector_body = np.array(magnetic_vector_body)
