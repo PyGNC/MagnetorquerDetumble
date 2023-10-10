@@ -32,6 +32,18 @@ Detumble = Controller(
     py4_dipole_limits
 )
 
+δ=0.053130000000000004*0.01
+
+function saturate(x, r)
+    if abs(x) <= δ
+        return r
+    elseif x > δ
+        return r
+    else # x < -δ
+        return -r
+    end
+end
+
 function control_law(measurement, t)
     (state, params) = measurement
 
@@ -39,8 +51,14 @@ function control_law(measurement, t)
 
 
     m = Detumble.get_control(state.angular_velocity, ᵇQⁿ * params.b)
+    for i in 1:3
+        m[i] = saturate(m[i], py4_dipole_limits[i])
+    end
+
+    @assert clamp.(m, -py4_dipole_limits, py4_dipole_limits) ≈ m
+    
     return SP.Control(
-        clamp.(m, -py4_dipole_limits, py4_dipole_limits)
+        m
     )
 end
 
@@ -68,7 +86,7 @@ function slow_rotation(state, params, t, i)
     return norm(state.angular_velocity) < deg2rad(0.1)
 end
 
-day = 60 * 60 * 24
+day = 60 * 60 
 time_step = 0.1
 @time (data, time) = SP.simulate(control_law, max_iterations=day / time_step, dt=time_step,
     log_init=log_init, log_step=log_step, log_end=log_end, initial_condition=x0, terminal_condition=slow_rotation)
@@ -79,4 +97,4 @@ time /= 60
 
 data = rad2deg.(data)
 
-display(plot(time, data, title="DeTumbling", xlabel="Time (minutes)", ylabel="Angular Velocity (deg/s)", labels=["ω1" "ω2" "ω3" "ω"]))
+display(plot(time, data, title="DeTumbling with (δ = $δ)", xlabel="Time (minutes)", ylabel="Angular Velocity (deg/s)", labels=["ω1" "ω2" "ω3" "ω"]))
