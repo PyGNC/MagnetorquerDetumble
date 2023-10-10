@@ -4,8 +4,6 @@ except:
     import numpy as np
 
 GM_EARTH = 3.986004415e14  # TODO: move this to a constants repository
-
-
 class Controller:
     """
     Implementation of the B-Cross detumble controller
@@ -35,7 +33,8 @@ class Controller:
 
         if k_gain is None:
             # default to optimal gain
-            self.k_gain = self._bcross_gain(semi_major_axis, inclination, minimum_inertia_moment)
+            self.k_gain = self._bcross_gain(
+                semi_major_axis, inclination, minimum_inertia_moment)
         else:
             self.k_gain = k_gain
 
@@ -127,7 +126,10 @@ class Controller:
 
         :return scaled_control_dipole: the computed control dipole, in the body frame, scaled to [-output_range, output_range]
         """
-        control_dipole = self._bcross_control(angular_rate_body, magnetic_vector_body, self.k_gain)
-        saturated_control_dipole = self._saturate_dipole(control_dipole, self.maximum_dipoles)
-        scaled_control_dipole = self._scale_dipole(saturated_control_dipole, self.maximum_dipoles, self.output_range)
+        control_dipole = self._bcross_control(
+            angular_rate_body, magnetic_vector_body, self.k_gain)
+        saturated_control_dipole = self._saturate_dipole(
+            control_dipole, self.maximum_dipoles)
+        scaled_control_dipole = self._scale_dipole(
+            saturated_control_dipole, self.maximum_dipoles, self.output_range)
         return scaled_control_dipole
