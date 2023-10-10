@@ -32,16 +32,18 @@ Detumble = Controller(
     py4_dipole_limits
 )
 
-δ=0.053130000000000004*0.01
+δ=0.053130000000000004*0.0002
+# δ=0.2
 
 function saturate(x, r)
     if abs(x) <= δ
-        return r
+        return 0
     elseif x > δ
         return r
-    else # x < -δ
+    elseif x < -δ
         return -r
     end
+    return 0
 end
 
 function control_law(measurement, t)
@@ -64,7 +66,7 @@ end
 
 
 
-down_sample_rate = 100
+down_sample_rate = 10
 
 function log_state(state)
     return [state.angular_velocity; norm(state.angular_velocity)]
