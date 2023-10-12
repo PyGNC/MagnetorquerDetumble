@@ -13,27 +13,23 @@ class PracticalController:
     * Does not use linear feedback, instead just saturates the control dipole
     """
 
-    def __init__(self, maximum_dipoles, output_range, sense_time=5.0, actuate_time=5.0):
+    def __init__(self, maximum_dipoles, output_range, mag_data, gyro_data):
         """
         :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2 
         :param output_range: the maximum output values to rescale the control dipole to
-        :param sense_time: the time taken to sense the magnetic field, while not actuating, units in seconds (s)
-        :param actuate_time: the time taken to use the magnetic torque coils, while not sensing, units in seconds (s)
+        :param mag_data: the current magnetic field measurement in the body frame, units in Tesla (T)
+        :param gyro_data: the current angular rate in the body frame with units rad/s
         """
         self.output_range = np.array(output_range)
         self.maximum_dipoles = np.array(maximum_dipoles)
-        self.sense_time = sense_time
-        self.actuate_time = actuate_time
-
-        self.mode = None
-        self.timer = 0.0
+        self.mag_data = mag_data
+        self.gyro_data = gyro_data
 
     @staticmethod
     def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body):
-        k = 1.0  # Doesn't matter, we're just saturating
         control_dipole = PracticalController._bcross_control(
-            angular_rate_body, magnetic_vector_body, k)
-        scale_factor = np.min(np.abs(maximum_dipoles / control_dipole))
+            angular_rate_body, magnetic_vector_body, 1) # k = 1 Doesn't matter, we're just saturating
+        scale_factor = np.min(abs(maximum_dipoles / control_dipole))
 
         return scale_factor * control_dipole
 
@@ -70,46 +66,19 @@ class PracticalController:
         """
         return (saturated_control_dipole / maximum_dipoles) * output_range
 
-    def get_control(self, angular_rate_body, magnetic_vector_body, dt):
+    def get_control(self, dt):
         """
-       :param angular_rate_body: the current angular rate in the body frame with units rad/s 
-       :param magnetic_vector_body: the current magnetic field measurement in the body frame, units in Tesla (T)
        :param dt: the time step since the last call to get_control, units in seconds (s)
        """
-        control = np.zeros(3)
-        angular_rate_body = np.array(angular_rate_body)
-        magnetic_vector_body = np.array(magnetic_vector_body)
-        dt = float(dt)
+        # First order approximation I + hat(omega*dt) for propogating the attitude
+        propogation_matrix = np.eye(3) + skew(self.gyro_data * dt)
+        magnetic_vector = np.dot(
+            propogation_matrix.transpose(), self.mag_data)
 
-        if self.mode is None:
-            self.mode = 'sense'
-            self.timer = self.sense_time
-        elif self.mode == 'sense':
-            self.timer -= dt
-
-            self.magnetic_vector = magnetic_vector_body
-
-            if self.timer <= 0:
-                self.mode = 'actuate'
-                self.timer = self.actuate_time
-        elif self.mode == 'actuate':
-            # In this case we ignore the magnetic vector and use angular velocity to propogate the magnetic vector
-            self.timer -= dt
-
-            propogation_matrix = np.eye(3) + skew(angular_rate_body * dt)
-            self.magnetic_vector = np.dot(
-                propogation_matrix.T, self.magnetic_vector)
-            # First order approximation I + hat(omega *dt) for propogating the attitude
-
-            control = self.calculate_control(
-                self.maximum_dipoles, angular_rate_body, self.magnetic_vector)
-            control = PracticalController._scale_dipole(
-                control, self.maximum_dipoles, self.output_range)
-
-            if self.timer <= 0:
-                self.mode = 'sense'
-                self.timer = self.sense_time
-
+        control = self.calculate_control(
+            self.maximum_dipoles, self.gyro_data, magnetic_vector)
+        control = PracticalController._scale_dipole(
+            control, self.maximum_dipoles, self.output_range)
         return control
 
 
