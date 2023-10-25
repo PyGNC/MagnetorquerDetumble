@@ -26,6 +26,7 @@ class PracticalController:
         self.gyro_data_body = gyro_data_body # reference to gyro_data measurement in body frame
         self.prev_mag_data = np.zeros(3) # previous mag_data measurement
         self.magnetic_vector_body = np.zeros(3) # best estimate of B-vector in body frame
+        self.new_mag = True # flag indicating new magnetometer measurements
 
         # members used for calibrating magnetometer bias
         self.mag_bias_accumulator = np.zeros(3)
@@ -106,11 +107,12 @@ class PracticalController:
 
         return self.mag_bias_estimate_complete
 
-    def get_control(self, dt, mag_data_updated):
+    def get_control(self, dt):
         """
         :param dt: the time step since the last call to get_control, units in seconds (s)
         """
-        if mag_data_updated:
+        if self.new_mag:
+            self.new_mag = False
             # mag data has updated - subtract bias and save it
             self.magnetic_vector_body = self.mag_data_body - self.mag_bias
             # copy mag data over into prev_mag_data for comparison later
