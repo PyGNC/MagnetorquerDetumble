@@ -68,14 +68,14 @@ begin
     printed = false
     function practical_detumble_control(ω, b, dt)
         global printed
-        b_in .= R_sat_imu'b .+ mag_bias # magnetic field in imu frame
-        ω_in .= R_sat_imu'ω # angular rate in imu frame
+        b_in .= b .+ mag_bias # magnetic field in imu frame
+        ω_in .= ω # angular rate in imu frame
         if !PracticalDetumble.mag_bias_estimate_complete
             PracticalDetumble.update_bias_estimate(dt)
             m = 0.0 * zeros(3)
         else
             if !printed && PracticalDetumble.mag_bias_estimate_complete
-                println("\nestimated mag_bias_imu = $(R_sat_imu'PracticalDetumble.mag_bias)")
+                println("\nestimated mag_bias_imu = $(PracticalDetumble.mag_bias)")
                 printed = true
             end
             m = PracticalDetumble.get_control(dt, true)

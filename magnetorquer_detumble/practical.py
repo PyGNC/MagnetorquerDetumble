@@ -12,18 +12,18 @@ class PracticalController:
     * Accounts for the magnetic torque coils saturating the magnetometer
     """
 
-    def __init__(self, maximum_dipoles, output_range, mag_data, gyro_data, bias_calibration_gyro_threshold=6*np.pi):
+    def __init__(self, maximum_dipoles, output_range, mag_data_body, gyro_data_body, bias_calibration_gyro_threshold=6*np.pi):
         """
         :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2 
         :param output_range: the maximum output values to rescale the control dipole to
-        :param mag_data: the current magnetic field measurement in the body frame, units in Tesla (T)
-        :param gyro_data: the current angular rate in the body frame with units rad/s
+        :param mag_data_body: the current magnetic field measurement in the body frame, units in Tesla (T)
+        :param gyro_data_body: the current angular rate in the body frame with units rad/s
         :param bias_calibration_gyro_threshold: the angle the gyro measurements should integrate to for calibration to be considered complete
         """
         self.output_range = np.array(output_range)
         self.maximum_dipoles = np.array(maximum_dipoles)
-        self.mag_data_imu = mag_data # reference to mag_data measurement in IMU frame
-        self.gyro_data_imu = gyro_data # reference to gyro_data measurement in IMU frame
+        self.mag_data_body = mag_data_body # reference to mag_data measurement in body frame
+        self.gyro_data_body = gyro_data_body # reference to gyro_data measurement in body frame
         self.prev_mag_data = np.zeros(3) # previous mag_data measurement
         self.magnetic_vector_body = np.zeros(3) # best estimate of B-vector in body frame
 
@@ -35,19 +35,6 @@ class PracticalController:
         self.bias_calibration_gyro_threshold = bias_calibration_gyro_threshold
 
         self.mag_bias_estimate_complete = False
-
-        # Rotate into satellite coordinate frame
-        # sat_X = imu_Y
-        # sat_Y = -imu_X
-        # sat_Z = -imu_Z
-        self.R_sat_imu = np.array(
-            [
-                [0.0, 1.0, 0.0],
-                [-1.0, 0.0, 0.0],
-                [0.0, 0.0, -1.0],
-            ]
-        )
-
 
     @staticmethod
     def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body):
@@ -105,14 +92,11 @@ class PracticalController:
         :param dt: the time step since the last call to update_bias, units in seconds (s)
         sets self.mag_bias_estimate_complete to True if bias estimate is complete, and False if more updates needed
         """
-        mag_data_body = np.dot(self.R_sat_imu, self.mag_data_imu)
-        gyro_data_body = np.dot(self.R_sat_imu, self.gyro_data_imu)
-
-        self.mag_bias_accumulator += mag_data_body
+        self.mag_bias_accumulator += self.mag_data_body
         self.mag_bias_samples += 1
         self.mag_bias = self.mag_bias_accumulator / self.mag_bias_samples
 
-        self.gyro_accumulator += dt*gyro_data_body
+        self.gyro_accumulator += dt*self.gyro_data_body
         gyro_accumulator_magnitude = np.sqrt(np.dot(self.gyro_accumulator, self.gyro_accumulator))
 
         if gyro_accumulator_magnitude > self.bias_calibration_gyro_threshold:
@@ -126,22 +110,19 @@ class PracticalController:
         """
         :param dt: the time step since the last call to get_control, units in seconds (s)
         """
-        mag_data_body = np.dot(self.R_sat_imu, self.mag_data_imu)
-        gyro_data_body = np.dot(self.R_sat_imu, self.gyro_data_imu)
-        
         if mag_data_updated:
             # mag data has updated - subtract bias and save it
-            self.magnetic_vector_body = mag_data_body - self.mag_bias
+            self.magnetic_vector_body = self.mag_data_body - self.mag_bias
             # copy mag data over into prev_mag_data for comparison later
-            self.prev_mag_data = mag_data_body
+            self.prev_mag_data = self.mag_data_body
         else:
             # propagate magnetic vector into current body frame using gyro data
-            propagation_matrix = np.eye(3) + skew(gyro_data_body * dt)
+            propagation_matrix = np.eye(3) + skew(self.gyro_data_body * dt)
             self.magnetic_vector_body = np.dot(
                 propagation_matrix.transpose(), self.magnetic_vector_body)
 
         control = self.calculate_control(
-            self.maximum_dipoles, gyro_data_body, self.magnetic_vector_body)
+            self.maximum_dipoles, self.gyro_data_body, self.magnetic_vector_body)
         control = PracticalController._scale_dipole(
             control, self.maximum_dipoles, self.output_range)
         return control

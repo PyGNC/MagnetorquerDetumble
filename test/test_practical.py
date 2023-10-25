@@ -57,18 +57,18 @@ class TestPraticalController(unittest.TestCase):
         bias_gyro_angle_threshold = 6*np.pi
         controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_data, gyro_data, bias_calibration_gyro_threshold=bias_gyro_angle_threshold)
         ret = controller.update_bias_estimate(0.2)
-        np.testing.assert_array_almost_equal(controller.mag_bias, controller.R_sat_imu@mag_data)
+        np.testing.assert_array_almost_equal(controller.mag_bias, mag_data)
         self.assertFalse(controller.mag_bias_estimate_complete)
         self.assertEqual(controller.mag_bias_samples, 1)
 
         ret = controller.update_bias_estimate(0.2)
-        np.testing.assert_array_almost_equal(controller.mag_bias, controller.R_sat_imu@mag_data)
+        np.testing.assert_array_almost_equal(controller.mag_bias, mag_data)
         self.assertFalse(controller.mag_bias_estimate_complete)
         self.assertEqual(controller.mag_bias_samples, 2)
 
         gyro_data += bias_gyro_angle_threshold * np.ones(3)
         ret = controller.update_bias_estimate(1.0)
-        np.testing.assert_array_almost_equal(controller.mag_bias, controller.R_sat_imu@mag_data)
+        np.testing.assert_array_almost_equal(controller.mag_bias, mag_data)
         self.assertTrue(controller.mag_bias_estimate_complete)
         self.assertEqual(controller.mag_bias_samples, 3)
 
