@@ -10,7 +10,6 @@ class PracticalController:
     Practical implementation of the B-Cross detumble controller.
 
     * Accounts for the magnetic torque coils saturating the magnetometer
-    * Does not use linear feedback, instead just saturates the control dipole
     """
 
     def __init__(self, maximum_dipoles, output_range, mag_data, gyro_data):
@@ -70,10 +69,10 @@ class PracticalController:
         """
        :param dt: the time step since the last call to get_control, units in seconds (s)
        """
-        # First order approximation I + hat(omega*dt) for propogating the attitude
-        propogation_matrix = np.eye(3) + skew(self.gyro_data * dt)
+        # First order approximation I + hat(omega*dt) for propagating the attitude
+        propagation_matrix = np.eye(3) + skew(self.gyro_data * dt)
         magnetic_vector = np.dot(
-            propogation_matrix.transpose(), self.mag_data)
+            propagation_matrix.transpose(), self.mag_data)
 
         control = self.calculate_control(
             self.maximum_dipoles, self.gyro_data, magnetic_vector)
