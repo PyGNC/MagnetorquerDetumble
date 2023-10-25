@@ -41,3 +41,40 @@ class TestPraticalController(unittest.TestCase):
                 [1, 2, 3]), np.array([2, 1, 3])),
             np.array([1., 0.15, 0.7])
         )
+
+    def test_get_control(self):
+        mag_data = np.array([1.0, 2.0, 3.0])
+        gyro_data = np.array([-0.1, 0.1, 0.1])
+        controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_data, gyro_data)
+        ret = controller.get_control(0.2, mag_data_updated=True)
+        ret = controller.get_control(0.2, mag_data_updated=False)
+        self.assertEqual(ret.shape[0], 3)
+        self.assertEqual(len(ret.shape), 1)
+
+    def test_update_bias(self):
+        mag_data = np.array([1.0, 2.0, 3.0])
+        gyro_data = np.array([-0.1, 0.1, 0.1])
+        bias_gyro_angle_threshold = 6*np.pi
+        controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_data, gyro_data, bias_calibration_gyro_threshold=bias_gyro_angle_threshold)
+        ret = controller.update_bias_estimate(0.2)
+        np.testing.assert_array_almost_equal(controller.mag_bias, controller.R_sat_imu@mag_data)
+        self.assertFalse(controller.mag_bias_estimate_complete)
+        self.assertEqual(controller.mag_bias_samples, 1)
+
+        ret = controller.update_bias_estimate(0.2)
+        np.testing.assert_array_almost_equal(controller.mag_bias, controller.R_sat_imu@mag_data)
+        self.assertFalse(controller.mag_bias_estimate_complete)
+        self.assertEqual(controller.mag_bias_samples, 2)
+
+        gyro_data += bias_gyro_angle_threshold * np.ones(3)
+        ret = controller.update_bias_estimate(1.0)
+        np.testing.assert_array_almost_equal(controller.mag_bias, controller.R_sat_imu@mag_data)
+        self.assertTrue(controller.mag_bias_estimate_complete)
+        self.assertEqual(controller.mag_bias_samples, 3)
+
+        controller.clear_bias_estimate()
+        np.testing.assert_array_almost_equal(controller.mag_bias, np.zeros(3))
+        self.assertFalse(controller.mag_bias_estimate_complete)
+        np.testing.assert_array_almost_equal(controller.mag_bias_accumulator, np.zeros(3))
+        self.assertEqual(controller.mag_bias_samples, 0)
+        np.testing.assert_array_almost_equal(controller.gyro_accumulator, np.zeros(3))
