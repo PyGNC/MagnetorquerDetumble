@@ -24,7 +24,6 @@ class PracticalController:
         self.maximum_dipoles = np.array(maximum_dipoles)
         self.mag_data_body = mag_data_body # reference to mag_data measurement in body frame
         self.gyro_data_body = gyro_data_body # reference to gyro_data measurement in body frame
-        self.prev_mag_data = np.zeros(3) # previous mag_data measurement
         self.magnetic_vector_body = np.zeros(3) # best estimate of B-vector in body frame
         self.new_mag = True # flag indicating new magnetometer measurements
 
@@ -115,8 +114,6 @@ class PracticalController:
             self.new_mag = False
             # mag data has updated - subtract bias and save it
             self.magnetic_vector_body = self.mag_data_body - self.mag_bias
-            # copy mag data over into prev_mag_data for comparison later
-            self.prev_mag_data = self.mag_data_body
         else:
             # propagate magnetic vector into current body frame using gyro data
             propagation_matrix = np.eye(3) + skew(self.gyro_data_body * dt)
