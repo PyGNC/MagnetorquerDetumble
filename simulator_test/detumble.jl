@@ -1,3 +1,5 @@
+using Pkg
+Pkg.activate(@__DIR__)
 using LinearAlgebra
 using SatelliteDynamics
 using Plots
@@ -6,7 +8,7 @@ using PyCall
 
 SP = SatellitePlayground
 
-begin 
+begin
     # Initial Conditions
     semi_major_axis = 400e3 + SatelliteDynamics.R_EARTH
     inclination = deg2rad(50)
@@ -46,16 +48,42 @@ sys.path.insert(0, "..")
 """
 magnetorquer_detumble = pyimport("magnetorquer_detumble")
 
+R_sat_imu = [
+    0.0 1.0 0.0
+    -1.0 0.0 0.0
+    0.0 0.0 -1.0
+]
+mag_bias = 40e-6 * (2 * rand(3) .- 1.0) # bias in +/- 40uT
+println("mag_bias_imu = $mag_bias")
 begin
-    PracticalController= magnetorquer_detumble.PracticalController
+    PracticalController = magnetorquer_detumble.PracticalController
+    ω_in = zeros(3)
+    b_in = zeros(3)
+
     PracticalDetumble = PracticalController(
         model.control_limit,
         model.control_limit,
-        sense_time=1.0,
-        actuate_time=1.0,
+        b_in,
+        ω_in,
+        10 * pi,
     )
+    printed = false
     function practical_detumble_control(ω, b, dt)
-        return PracticalDetumble.get_control(ω, b, dt)
+        global printed
+        b_in .= b .+ mag_bias # magnetic field in imu frame
+        ω_in .= ω # angular rate in imu frame
+        if !PracticalDetumble.mag_bias_estimate_complete
+            PracticalDetumble.update_bias_estimate(dt)
+            m = 0.0 * zeros(3)
+        else
+            if !printed && PracticalDetumble.mag_bias_estimate_complete
+                println("\nestimated mag_bias_imu = $(PracticalDetumble.mag_bias)")
+                printed = true
+            end
+            PracticalDetumble.new_mag = true
+            m = PracticalDetumble.get_control(dt)
+        end
+        return m
     end
 end
 begin
@@ -100,7 +128,7 @@ function slow_rotation(state, env, i)
 end
 
 @time (data, time) = SP.simulate(control_law, max_iterations=day / time_step, dt=time_step, environment=env,
-    log_init=log_init, log_step=log_step, initial_condition=x0, terminal_condition=slow_rotation, model=model)
+    log_init=log_init, log_step=log_step, initial_condition=x0, terminal_condition=slow_rotation, model=model, silent=false)
 # 465.717581 seconds (1.48 G allocations: 94.596 GiB, 8.23% gc time, 0.02% compilation time: 82% of which was recompilation)
 
 # Old result: ω=0.129 at 3 hours
