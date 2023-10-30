@@ -46,8 +46,10 @@ class TestPraticalController(unittest.TestCase):
         mag_data = np.array([1.0, 2.0, 3.0])
         gyro_data = np.array([-0.1, 0.1, 0.1])
         controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_data, gyro_data)
-        ret = controller.get_control(0.2, mag_data_updated=True)
-        ret = controller.get_control(0.2, mag_data_updated=False)
+        controller.new_mag = True
+        ret = controller.get_control(0.2)
+        controller.new_mag = False
+        ret = controller.get_control(0.2)
         self.assertEqual(ret.shape[0], 3)
         self.assertEqual(len(ret.shape), 1)
 
