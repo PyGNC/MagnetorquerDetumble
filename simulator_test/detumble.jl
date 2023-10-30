@@ -1,3 +1,5 @@
+using Pkg
+Pkg.activate(@__DIR__)
 using LinearAlgebra
 using SatelliteDynamics
 using Plots
@@ -78,7 +80,8 @@ begin
                 println("\nestimated mag_bias_imu = $(PracticalDetumble.mag_bias)")
                 printed = true
             end
-            m = PracticalDetumble.get_control(dt, true)
+            PracticalDetumble.new_mag = true
+            m = PracticalDetumble.get_control(dt)
         end
         return m
     end
