@@ -12,7 +12,8 @@ class PracticalController:
     * Accounts for the magnetic torque coils saturating the magnetometer
     """
 
-    def __init__(self, maximum_dipoles, output_range, mag_data_body, gyro_data_body, bias_calibration_gyro_threshold=6*np.pi):
+    def __init__(self, maximum_dipoles, output_range, mag_data_body, gyro_data_body, bias_calibration_gyro_threshold=6*np.pi,
+        use_sun_controller=True):
         """
         :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2 
         :param output_range: the maximum output values to rescale the control dipole to
@@ -35,11 +36,21 @@ class PracticalController:
         self.bias_calibration_gyro_threshold = bias_calibration_gyro_threshold
 
         self.mag_bias_estimate_complete = False
+        self.interia_matrix = # TODO add from CAD
+        self.major_axis= # TODO add from CAD
+        self.minor_axis= # TODO add from CAD
+        self.six_lux_values= # TODO max will update
+        self.which_controller=use_sun_controller
 
     @staticmethod
     def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body):
-        control_dipole = PracticalController._bcross_control(
-            angular_rate_body, magnetic_vector_body, 1) # k = 1 Doesn't matter, we're just saturating
+        if self.use_sun_controller == 1: # sun pointing
+            # TODO update this
+            control_dipole = PracticalController._sun_point_control()
+        elif self.which_controller == 0: # detumble
+            control_dipole = PracticalController._bcross_control(
+                angular_rate_body, magnetic_vector_body, 1) # k = 1 Doesn't matter, we're just saturating
+
         scale_factor = np.min(abs(maximum_dipoles / control_dipole))
 
         return scale_factor * control_dipole
@@ -63,6 +74,18 @@ class PracticalController:
         m = (k_gain / Bnorm) * np.cross(omega, b)
         control_dipole = m
         return control_dipole
+
+    def _sun_point_control(angular_rate, magnetic_vector_body, k_gain):
+        # this will always be the latest raw lux values
+        self.six_lux_values #  TODO get_sun_vector function
+        J=self.interia_matrix
+        α = 0.1
+        h = J*ω
+        # hd = norm(h)*[0; 1; 0] #maybe change this to use a fixed desired value of norm(h)
+        hd = norm(h)*[0; Lxy from CAD; 0] # TODO use Lxy from CAD
+        u = hat(b)*((1-α)*(hd-h) + α*(s*norm(h)-h)) # TODO zac to implement
+        u = umax*u/norm(u)
+        # TODO zac finish and return like _bcross_control
 
     @staticmethod
     def _scale_dipole(saturated_control_dipole, maximum_dipoles, output_range):
@@ -106,7 +129,7 @@ class PracticalController:
 
         return self.mag_bias_estimate_complete
 
-    def get_control(self, dt):
+    def get_control(self, dt, which_controller=sun):
         """
         :param dt: the time step since the last call to get_control, units in seconds (s)
         """
