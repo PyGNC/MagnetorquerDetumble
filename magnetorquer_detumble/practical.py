@@ -36,10 +36,12 @@ class PracticalController:
         self.bias_calibration_gyro_threshold = bias_calibration_gyro_threshold
 
         self.mag_bias_estimate_complete = False
-        self.interia_matrix = # TODO add from CAD
-        self.major_axis= # TODO add from CAD
-        self.minor_axis= # TODO add from CAD
-        self.six_lux_values= # TODO max will update
+
+        # members used for sun-pointing controller
+        self.inertia_matrix = np.array([[0.0043, -0.0003, 0.0], [-0.0003, 0.0049, 0.0],[0.0, 0.0, 0.0035]])
+        self.major_axis = np.array([0.3503, 0.9365, 0.0152])
+        self.minor_axis = np.array([-0.0011, -0.0158, 0.9999])
+        self.six_lux_values = # TODO max will update
         self.which_controller=use_sun_controller
 
     @staticmethod
@@ -75,17 +77,28 @@ class PracticalController:
         control_dipole = m
         return control_dipole
 
-    def _sun_point_control(angular_rate, magnetic_vector_body, k_gain):
-        # this will always be the latest raw lux values
-        self.six_lux_values #  TODO get_sun_vector function
-        J=self.interia_matrix
-        α = 0.1
-        h = J*ω
-        # hd = norm(h)*[0; 1; 0] #maybe change this to use a fixed desired value of norm(h)
-        hd = norm(h)*[0; Lxy from CAD; 0] # TODO use Lxy from CAD
-        u = hat(b)*((1-α)*(hd-h) + α*(s*norm(h)-h)) # TODO zac to implement
-        u = umax*u/norm(u)
-        # TODO zac finish and return like _bcross_control
+    @staticmethod
+    def _sun_point_control(angular_rate, magnetic_vector_body, lux_sensor_values, inertia_matrix, desired_angular_momentum_vector):
+        
+        omega = angular_rate
+        J = inertia_matrix
+        hd = desired_angular_momentum_vector
+
+        B = magnetic_vector_body
+        Bnorm = np.linalg.norm(B)
+        b = B/Bnorm
+
+        S = np.array([lux_sensor_values[0]-lux_sensor_values[3], lux_sensor_values[1]-lux_sensor_values[4], lux_sensor_values[2]-lux_sensor_values[5]])
+        Snorm = np.linalg.norm(S)
+        s = S/Snorm
+
+        alpha = 0.1
+
+        h = J@omega
+ 
+        u = np.cross(b, (1-alpha)*(hd-h) + alpha*(s*np.linalg.norm(h)-h))
+
+        return = umax*u/norm(u)
 
     @staticmethod
     def _scale_dipole(saturated_control_dipole, maximum_dipoles, output_range):
