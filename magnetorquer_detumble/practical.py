@@ -13,9 +13,9 @@ class PracticalController:
     """
 
     def __init__(self, maximum_dipoles, output_range, mag_data_body, gyro_data_body, bias_calibration_gyro_threshold=6*np.pi,
-        use_sun_controller=True):
+        which_controller=1): # default sun controller
         """
-        :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2 
+        :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
         :param output_range: the maximum output values to rescale the control dipole to
         :param mag_data_body: the current magnetic field measurement in the body frame, units in Tesla (T)
         :param gyro_data_body: the current angular rate in the body frame with units rad/s
@@ -25,8 +25,11 @@ class PracticalController:
         self.maximum_dipoles = np.array(maximum_dipoles)
         self.mag_data_body = mag_data_body # reference to mag_data measurement in body frame
         self.gyro_data_body = gyro_data_body # reference to gyro_data measurement in body frame
+        self.sun_data_body = sun_data_body # all six lux values +xyz-xyz
+        self.sun_vector_body = np.zeros(3)
         self.magnetic_vector_body = np.zeros(3) # best estimate of B-vector in body frame
         self.new_mag = True # flag indicating new magnetometer measurements
+        self.new_sun = True
 
         # members used for calibrating magnetometer bias
         self.mag_bias_accumulator = np.zeros(3)
@@ -34,6 +37,8 @@ class PracticalController:
         self.mag_bias_samples = 0
         self.gyro_accumulator = np.zeros(3)
         self.bias_calibration_gyro_threshold = bias_calibration_gyro_threshold
+        self.sun_bias_accumulator = np.zeros(3)
+        self.sun_bias = np.zeros(3)
 
         self.mag_bias_estimate_complete = False
 
@@ -41,14 +46,12 @@ class PracticalController:
         self.inertia_matrix = np.array([[0.0043, -0.0003, 0.0], [-0.0003, 0.0049, 0.0],[0.0, 0.0, 0.0035]])
         self.major_axis = np.array([0.3503, 0.9365, 0.0152])
         self.minor_axis = np.array([-0.0011, -0.0158, 0.9999])
-        self.six_lux_values = # TODO max will update
         self.which_controller=use_sun_controller
 
-    @staticmethod
     def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body):
         if self.use_sun_controller == 1: # sun pointing
-            # TODO update this
-            control_dipole = PracticalController._sun_point_control()
+            control_dipole = PracticalController._sun_point_control(
+                angular_rate_body, magnetic_vector_body, desired_spin_axis) # TODO which desired_spin_axis?
         elif self.which_controller == 0: # detumble
             control_dipole = PracticalController._bcross_control(
                 angular_rate_body, magnetic_vector_body, 1) # k = 1 Doesn't matter, we're just saturating
@@ -77,28 +80,20 @@ class PracticalController:
         control_dipole = m
         return control_dipole
 
-    @staticmethod
-    def _sun_point_control(angular_rate, magnetic_vector_body, lux_sensor_values, inertia_matrix, desired_spin_axis):
-        
-        omega = angular_rate
-        J = inertia_matrix
+    def _sun_point_control(angular_rate, magnetic_vector_body, desired_spin_axis):
 
-        #Calculate normalized magnetic field vector
-        B = magnetic_vector_body
-        Bnorm = np.linalg.norm(B)
-        b = B/Bnorm
+        # Calculate normalized magnetic field vector
+        b = magnetic_vector_body/np.linalg.norm(magnetic_vector_body)
 
-        #Calculate normalized sun vector
-        S = np.array([lux_sensor_values[0]-lux_sensor_values[3], lux_sensor_values[1]-lux_sensor_values[4], lux_sensor_values[2]-lux_sensor_values[5]])
-        Snorm = np.linalg.norm(S)
-        s = S/Snorm
+        # Calculate normalized sun vector
+        s = self.sun_vector_body/np.linalg.norm(self.sun_vector_body)
 
         alpha = 0.1
 
-        #Calculate body-frame angular momentum vector
-        h = J@omega
+        # Calculate body-frame angular momentum vector
+        h = np.dot(self.inertia_matrix,angular_rate)
         hd = np.linalg.norm(h)*desired_spin_axis
- 
+
         u = np.cross(b, (1-alpha)*(hd-h) + alpha*(s*np.linalg.norm(h)-h))
 
         return u/np.linalg.norm(u)
@@ -115,14 +110,16 @@ class PracticalController:
         :param output_range: the maximum output values to rescale the control dipole to
         """
         return (saturated_control_dipole / maximum_dipoles) * output_range
-    
+
     def clear_bias_estimate(self):
         """
-        Clear the magnetometer bias estimate
+        Clear the magnetometer and sun bias estimate
         """
         self.mag_bias_accumulator = np.zeros(3)
         self.mag_bias = np.zeros(3)
         self.mag_bias_samples = 0
+        self.sun_bias_accumulator = np.zeros(3)
+        self.sun_bias = np.zeros(3)
         self.gyro_accumulator = np.zeros(3)
         self.mag_bias_estimate_complete = False
 
@@ -133,7 +130,11 @@ class PracticalController:
         """
         self.mag_bias_accumulator += self.mag_data_body
         self.mag_bias_samples += 1
-        self.mag_bias = self.mag_bias_accumulator / self.mag_bias_samples
+        self.mag_bias[:] = self.mag_bias_accumulator / self.mag_bias_samples
+
+        if self.which_controller == 1: # sun pointing
+            self.sun_bias_accumulator += self.sun_data_body
+            self.sun_bias[:] = self.sun_bias_accumulator / self.mag_bias_samples
 
         self.gyro_accumulator += dt*self.gyro_data_body
         gyro_accumulator_magnitude = np.sqrt(np.dot(self.gyro_accumulator, self.gyro_accumulator))
@@ -145,7 +146,7 @@ class PracticalController:
 
         return self.mag_bias_estimate_complete
 
-    def get_control(self, dt, which_controller=sun):
+    def get_control(self, dt):
         """
         :param dt: the time step since the last call to get_control, units in seconds (s)
         """
@@ -158,6 +159,19 @@ class PracticalController:
             propagation_matrix = np.eye(3) + skew(self.gyro_data_body * dt)
             self.magnetic_vector_body = np.dot(
                 propagation_matrix.transpose(), self.magnetic_vector_body)
+
+        if self.which_controller == 1: # sun pointing
+            if self.new_sun:
+                self.new_sun = False
+                # sun data has updated - subtract bias and save it
+                self.sun_data_body = self.sun_data_body - self.sun_bias
+            else:
+                # propagate sun vector into current body frame using gyro data
+                propagation_matrix = np.eye(3) + skew(self.gyro_data_body * dt)
+                self.sun_data_body = np.dot(
+                    propagation_matrix.transpose(), self.sun_data_body)
+            # sun vector from raw lux
+            self.sun_vector_body[:] = [self.sun_data_body[i]-self.sun_data_body[i+3] for i in range(3)]
 
         control = self.calculate_control(
             self.maximum_dipoles, self.gyro_data_body, self.magnetic_vector_body)
