@@ -78,27 +78,30 @@ class PracticalController:
         return control_dipole
 
     @staticmethod
-    def _sun_point_control(angular_rate, magnetic_vector_body, lux_sensor_values, inertia_matrix, desired_angular_momentum_vector):
+    def _sun_point_control(angular_rate, magnetic_vector_body, lux_sensor_values, inertia_matrix, desired_spin_axis):
         
         omega = angular_rate
         J = inertia_matrix
-        hd = desired_angular_momentum_vector
 
+        #Calculate normalized magnetic field vector
         B = magnetic_vector_body
         Bnorm = np.linalg.norm(B)
         b = B/Bnorm
 
+        #Calculate normalized sun vector
         S = np.array([lux_sensor_values[0]-lux_sensor_values[3], lux_sensor_values[1]-lux_sensor_values[4], lux_sensor_values[2]-lux_sensor_values[5]])
         Snorm = np.linalg.norm(S)
         s = S/Snorm
 
         alpha = 0.1
 
+        #Calculate body-frame angular momentum vector
         h = J@omega
+        hd = np.linalg.norm(h)*desired_spin_axis
  
         u = np.cross(b, (1-alpha)*(hd-h) + alpha*(s*np.linalg.norm(h)-h))
 
-        return = umax*u/norm(u)
+        return u/np.linalg.norm(u)
 
     @staticmethod
     def _scale_dipole(saturated_control_dipole, maximum_dipoles, output_range):
