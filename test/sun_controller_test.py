@@ -95,3 +95,10 @@ controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_dat
 control = controller.get_control(0.2)
 
 print(control)
+
+#Plan: 
+
+#1. Get a txt file of the sun sensor and magnetometer data at 10 Hz
+#2. Get a txt file of the ground truth running at 22 Hz. From the ground truth, make up gyro data
+# by adding noise and and a bias
+#3. Run the controller on the data and see if it works
