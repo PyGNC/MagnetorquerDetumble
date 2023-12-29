@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-from .context import magnetorquer_detumble
+from context import magnetorquer_detumble
+
 
 skew = magnetorquer_detumble.practical.skew
 PC = magnetorquer_detumble.practical.PracticalController
@@ -24,8 +25,9 @@ class TestPraticalController(unittest.TestCase):
 
     def test_calculate_control_regression(self):
         np.testing.assert_array_almost_equal(
-            PC.calculate_control(
-                [1, 2, 3], [0.01, 0.06, -0.03], [0.03, 0.07, -0.09]),
+            #add in new argument for which_controller
+            PC.calculate_control(self, 
+                [1, 2, 3], [0.01, 0.06, -0.03], [0.03, 0.07, -0.09], 0),
             np.array([-1.00000000e+00,  3.09880124e-17, -3.33333333e-01])
         )
 
@@ -45,7 +47,9 @@ class TestPraticalController(unittest.TestCase):
     def test_get_control(self):
         mag_data = np.array([1.0, 2.0, 3.0])
         gyro_data = np.array([-0.1, 0.1, 0.1])
-        controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_data, gyro_data)
+        sun_data = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+
+        controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_data, gyro_data, sun_data, 6*np.pi, which_controller=0)
         controller.new_mag = True
         ret = controller.get_control(0.2)
         controller.new_mag = False
@@ -56,8 +60,9 @@ class TestPraticalController(unittest.TestCase):
     def test_update_bias(self):
         mag_data = np.array([1.0, 2.0, 3.0])
         gyro_data = np.array([-0.1, 0.1, 0.1])
+        sun_data = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
         bias_gyro_angle_threshold = 6*np.pi
-        controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_data, gyro_data, bias_calibration_gyro_threshold=bias_gyro_angle_threshold)
+        controller = PC(np.array([10.0, 11.0, 12.0]), np.array([0.5, 0.6, 0.3]), mag_data, gyro_data, sun_data, bias_calibration_gyro_threshold=bias_gyro_angle_threshold, which_controller=0)
         ret = controller.update_bias_estimate(0.2)
         np.testing.assert_array_almost_equal(controller.mag_bias, mag_data)
         self.assertFalse(controller.mag_bias_estimate_complete)
@@ -80,3 +85,7 @@ class TestPraticalController(unittest.TestCase):
         np.testing.assert_array_almost_equal(controller.mag_bias_accumulator, np.zeros(3))
         self.assertEqual(controller.mag_bias_samples, 0)
         np.testing.assert_array_almost_equal(controller.gyro_accumulator, np.zeros(3))
+
+
+if __name__ == "__main__":
+    unittest.main()

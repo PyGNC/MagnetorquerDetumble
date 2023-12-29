@@ -12,7 +12,7 @@ class PracticalController:
     * Accounts for the magnetic torque coils saturating the magnetometer
     """
 
-    def __init__(self, maximum_dipoles, output_range, mag_data_body, gyro_data_body, bias_calibration_gyro_threshold=6*np.pi,
+    def __init__(self, maximum_dipoles, output_range, mag_data_body, gyro_data_body, sun_data_body,  bias_calibration_gyro_threshold=6*np.pi,
         which_controller=1): # default sun controller
         """
         :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
@@ -47,10 +47,16 @@ class PracticalController:
         self.major_axis = np.array([0.3503, 0.9365, 0.0152])
         self.minor_axis = np.array([-0.0011, -0.0158, 0.9999])
         self.which_controller=which_controller
+        self.umax = 50*.1*.1*0.1
 
-    def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body, which_controller):
+    #def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body, which_controller):
+    def calculate_control(self, maximum_dipoles, angular_rate_body, magnetic_vector_body, which_controller):
+
+        #temporarily defining the desired spin axis here
+        desired_spin_axis = self.major_axis
+
         if which_controller == 1: # sun pointing
-            control_dipole = PracticalController._sun_point_control(
+            control_dipole = PracticalController._sun_point_control(self,
                 angular_rate_body, magnetic_vector_body, desired_spin_axis) # TODO which desired_spin_axis?
         elif which_controller == 0: # detumble
             control_dipole = PracticalController._bcross_control(
@@ -80,7 +86,31 @@ class PracticalController:
         control_dipole = m
         return control_dipole
 
-    def _sun_point_control(angular_rate, magnetic_vector_body, desired_spin_axis):
+#the angular rate will be biased since it's from gyro
+#previous version of _sun_point_control
+    # def _sun_point_control(self, angular_rate, magnetic_vector_body, desired_spin_axis):
+
+    #     # Calculate normalized magnetic field vector
+    #     b = magnetic_vector_body/np.linalg.norm(magnetic_vector_body)
+
+    #     # Calculate normalized sun vector
+    #     s = self.sun_vector_body/np.linalg.norm(self.sun_vector_body)
+
+    #     alpha = 0.1
+
+    #     # Calculate body-frame angular momentum vector
+    #     h = np.dot(self.inertia_matrix,angular_rate)
+    #     hd = np.linalg.norm(h)*desired_spin_axis
+
+    #     u = np.cross(b, (1-alpha)*(hd-h) + alpha*(s*np.linalg.norm(h)-h))
+
+    #     return u/np.linalg.norm(u)
+
+#the angular rate will be biased since it's from gyro
+#new version of _sun_point_control
+    def _sun_point_control(self, angular_rate, magnetic_vector_body, desired_spin_axis):
+
+        h = np.dot(self.inertia_matrix,angular_rate)
 
         # Calculate normalized magnetic field vector
         b = magnetic_vector_body/np.linalg.norm(magnetic_vector_body)
@@ -88,15 +118,15 @@ class PracticalController:
         # Calculate normalized sun vector
         s = self.sun_vector_body/np.linalg.norm(self.sun_vector_body)
 
-        alpha = 0.1
+        h_target = 0.2*0.005
+        #desired spin axis will be the major axis
 
-        # Calculate body-frame angular momentum vector
-        h = np.dot(self.inertia_matrix,angular_rate)
-        hd = np.linalg.norm(h)*desired_spin_axis
+        if np.linalg.norm(desired_spin_axis - h/h_target) > 0.26 or np.linalg.norm(s - h/np.linalg.norm(h)) < 0.17:
+            u = skew(b) @ (desired_spin_axis-h/h_target)
+        else:
+            u = skew(b) @ (s-h/np.linalg.norm(h))
 
-        u = np.cross(b, (1-alpha)*(hd-h) + alpha*(s*np.linalg.norm(h)-h))
-
-        return u/np.linalg.norm(u)
+        return self.umax*u/np.linalg.norm(u)
 
     @staticmethod
     def _scale_dipole(saturated_control_dipole, maximum_dipoles, output_range):
@@ -163,18 +193,37 @@ class PracticalController:
         if self.which_controller == 1: # sun pointing
             if self.new_sun:
                 self.new_sun = False
+
+                # sun vector from raw lux
+                self.sun_vector_body[:] = [self.sun_data_body[i]-self.sun_data_body[i+3] for i in range(3)]
+
                 # sun data has updated - subtract bias and save it
-                self.sun_data_body = self.sun_data_body - self.sun_bias
+                self.sun_vector_body = self.sun_vector_body - self.sun_bias
+
+                #ask Max about the sun bias. bias on the vector or lux measurements?
             else:
                 # propagate sun vector into current body frame using gyro data
-                propagation_matrix = np.eye(3) + skew(self.gyro_data_body * dt)
-                self.sun_data_body = np.dot(
-                    propagation_matrix.transpose(), self.sun_data_body)
-            # sun vector from raw lux
-            self.sun_vector_body[:] = [self.sun_data_body[i]-self.sun_data_body[i+3] for i in range(3)]
 
+                # sun vector from raw lux
+                self.sun_vector_body[:] = [self.sun_data_body[i]-self.sun_data_body[i+3] for i in range(3)]
+
+                propagation_matrix = np.eye(3) + skew(self.gyro_data_body * dt)
+
+                self.sun_vector_body = np.dot(
+                    propagation_matrix.transpose(), self.sun_vector_body)
+
+            # # sun vector from raw lux
+            # self.sun_vector_body[:] = [self.sun_data_body[i]-self.sun_data_body[i+3] for i in range(3)]
+
+        # print("maximum dipoles: ", self.maximum_dipoles)
+        # print("gyro data body: ", self.gyro_data_body)
+        # print("magnetic vector body: ", self.magnetic_vector_body)
         control = self.calculate_control(
-            self.maximum_dipoles, self.gyro_data_body, self.magnetic_vector_body, self.which_controller)
+           self.maximum_dipoles, self.gyro_data_body, self.magnetic_vector_body, self.which_controller)
+
+        # control = self.calculate_control(
+        #     self.maximum_dipoles, self.gyro_data_body, self.magnetic_vector_body)
+
         control = PracticalController._scale_dipole(
             control, self.maximum_dipoles, self.output_range)
         return control
