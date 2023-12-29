@@ -43,16 +43,16 @@ class PracticalController:
         self.mag_bias_estimate_complete = False
 
         # members used for sun-pointing controller
-        self.inertia_matrix = np.array([[0.0043, -0.0003, 0.0], [-0.0003, 0.0049, 0.0],[0.0, 0.0, 0.0035]])
+        self.inertia_matrix = np.array([[0.0043, -0.0003, 0.0],[-0.0003, 0.0049, 0.0],[0.0, 0.0, 0.0035]])
         self.major_axis = np.array([0.3503, 0.9365, 0.0152])
         self.minor_axis = np.array([-0.0011, -0.0158, 0.9999])
-        self.which_controller=use_sun_controller
+        self.which_controller=which_controller
 
-    def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body):
-        if self.use_sun_controller == 1: # sun pointing
+    def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body, which_controller):
+        if which_controller == 1: # sun pointing
             control_dipole = PracticalController._sun_point_control(
                 angular_rate_body, magnetic_vector_body, desired_spin_axis) # TODO which desired_spin_axis?
-        elif self.which_controller == 0: # detumble
+        elif which_controller == 0: # detumble
             control_dipole = PracticalController._bcross_control(
                 angular_rate_body, magnetic_vector_body, 1) # k = 1 Doesn't matter, we're just saturating
 
@@ -174,7 +174,7 @@ class PracticalController:
             self.sun_vector_body[:] = [self.sun_data_body[i]-self.sun_data_body[i+3] for i in range(3)]
 
         control = self.calculate_control(
-            self.maximum_dipoles, self.gyro_data_body, self.magnetic_vector_body)
+            self.maximum_dipoles, self.gyro_data_body, self.magnetic_vector_body, self.which_controller)
         control = PracticalController._scale_dipole(
             control, self.maximum_dipoles, self.output_range)
         return control
