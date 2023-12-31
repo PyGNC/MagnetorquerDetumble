@@ -13,6 +13,11 @@ using PyCall
 
 SP = SatellitePlayground
 
+all_lux = []
+
+#inertia matrix
+J = [0.0043 -0.0003 0; -0.0003 0.0049 0; 0 0 0.0035] # kg*m^2, determined from CAD
+
 begin
     # Initial Conditions
     semi_major_axis = 400e3 + SatelliteDynamics.R_EARTH
@@ -45,7 +50,7 @@ end
 # day = 60 * 60 * 24
 #change maybe? 
 
-day = 60 * 60 * 12
+day = 60 * 60 * 3
 # day = 10
 time_step = 0.1
 
@@ -154,6 +159,8 @@ function control_law(measurement)
     #get the lux measurement
     lux_measurement = get_lux_measurement(state, env)
 
+    push!(all_lux, lux_measurement)
+
     m = practical_detumble_control(state.angular_velocity, env.b, lux_measurement, dt)
     return SP.Control(
         m
@@ -161,7 +168,8 @@ function control_law(measurement)
 end
 
 function log_state(state)
-    return norm(state.angular_velocity)
+    return state
+    #return norm(state.angular_velocity)
 end
 
 function log_init(state)
@@ -177,6 +185,7 @@ function slow_rotation(state, env, i)
 end
 
 #@time 
+#change to default log step
 (data, time) = SP.simulate(control_law, max_iterations=day / time_step, dt=time_step, environment=env,
     log_init=log_init, log_step=log_step, initial_condition=x0, terminal_condition=slow_rotation, model=model, silent=false)
 
@@ -185,14 +194,54 @@ end
 # Old result: ω=0.129 at 3 hours
 # New result: ω=0.156 at 3 hours
 
+#returns the normalized sun vector
+function get_sun_vector(lux_m)
+
+    return (lux_m[1:3] - lux_m[4:6])/norm(lux_m[1:3] - lux_m[4:6])
+
+end
+
+function get_angular_momentum(omega)
+    
+        return J * omega
+    
+end
+
+data = SP.vec_to_mat(data)
+
+sun_data = SP.vec_to_mat(all_lux)
+
 down_sample_rate = 10
 
-data = data[1:down_sample_rate:end]
-time = time[1:down_sample_rate:end]
+angular_velocity_data = data[1:down_sample_rate:end, 11:13]
+sun_data = sun_data[1:down_sample_rate:end, :]
+time = time[1:down_sample_rate:end, :]
 time /= 60
 
-data = rad2deg.(data)
-detumble_plot = plot(time, data, title="DeTumbling", xlabel="Time (minutes)", ylabel="Angular Velocity (deg/s)", labels=["ω"])
+all_spin_axes = zeros(size(angular_velocity_data)[1], 3)
+all_angular_momentum = zeros(size(angular_velocity_data)[1], 3)
+
+all_sun_vectors = zeros(size(sun_data)[1], 3)
+sun_error = zeros(size(angular_velocity_data)[1])
+
+for i = 1:size(angular_velocity_data)[1]
+    #all_spin_axes[i, :] = angular_velocity_data[i, :]/norm(angular_velocity_data[i, :]) 
+    all_angular_momentum[i, :] = get_angular_momentum(angular_velocity_data[i, :])    
+    all_sun_vectors[i, :] = get_sun_vector(sun_data[i, :])
+    #sun_error[i] = (180/pi)*acos(all_spin_axes[i, :]'*all_sun_vectors[i, :])
+
+    sun_error[i] = (180/pi)*acos(all_angular_momentum[i, :]'*all_sun_vectors[i, :])
+
+    #println("this is sun error: ", sun_error[i])
+end
+
+#plot the difference between angular momentum and sun vector
+
+
+#println("size of angular velocity data: ", size(angular_velocity_data))
+#println("size of sun data: ", size(sun_data))
+#data = rad2deg.(data)
+sun_error_plot = plot(time, sun_error, title="Sun Error", xlabel="Time (minutes)", ylabel="Sun Error (deg)", labels=["se"])
 
 #save the plot
-savefig(detumble_plot, "sun_controller.png")
+savefig(sun_error_plot, "sun_error_plot.png")
