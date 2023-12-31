@@ -1,3 +1,8 @@
+#sun test
+
+#structure similar to detumble.jl but adding in sun sensor measurement 
+# to obtain the new control control_law
+
 using Pkg
 #Pkg.activate(@__DIR__)
 using LinearAlgebra
@@ -5,7 +10,6 @@ using SatelliteDynamics
 using Plots
 using SatellitePlayground
 using PyCall
-using DelimitedFiles
 
 SP = SatellitePlayground
 
@@ -18,7 +22,6 @@ begin
     ω0 = 0.1 * [0.3, 0.1, -0.2]
     ω0 = ω0 / norm(ω0) * deg2rad(10.0)
     x0 = SP.state_from_osc(x_osc_0, q0, ω0)
-
 end
 
 begin
@@ -40,7 +43,8 @@ begin
 end
 
 # day = 60 * 60 * 24
-#try 12 hours...
+#change maybe? 
+
 day = 60 * 60 * 12
 # day = 10
 time_step = 0.1
@@ -72,13 +76,14 @@ begin
         lux_in,
         10 * pi,
         #added in
-        which_controller = 0,
+        which_controller = 1,
     )
     printed = false
-    function practical_detumble_control(ω, b, dt)
+    function practical_detumble_control(ω, b, lux, dt)
         global printed
         b_in .= b .+ mag_bias # magnetic field in imu frame
         ω_in .= ω # angular rate in imu frame
+        lux_in .= lux #lux
         if !PracticalDetumble.mag_bias_estimate_complete
             PracticalDetumble.update_bias_estimate(dt)
             m = 0.0 * zeros(3)
@@ -107,12 +112,49 @@ begin
     end
 end
 
+function get_lux_measurement(state, env)
+
+    #define parameters from models.jl
+    standard_deviation = 0.01
+    solar_lux =(1361 * 98)
+    earth_albedo_lux = 0.4 * (1361 * 98)
+    dark_condition_lux = 0.0
+
+    #0.01 is the standard deviation of the sun sensor
+    #defined in models.jl in pygnc repo
+    sun_std_dev_matrix = I(3) .* 0.01
+
+    sun_vector_eci = SatelliteDynamics.sun_position(env.time)
+    #unix_time_s = epoch_to_unix_time(env.time)
+
+    ᵇQⁿ = SP.quaternionToMatrix(state.attitude)'
+
+    # since the sun vector is normalized and in the body frame,
+    # each component is the cos() of the angle between the sun and that satellite face
+    sun_vector_body = ᵇQⁿ * normalize(state.position .- sun_vector_eci) + sun_std_dev_matrix * randn(3)
+    earth_vector_body = ᵇQⁿ * normalize(-state.position) + sun_std_dev_matrix * randn(3)
+    # combine sun and earth albedo lux
+    lux_vector_body = (solar_lux * sun_vector_body +
+                        earth_albedo_lux * earth_vector_body)
+    dark_measurement = dark_condition_lux * rand(3)
+    sun_sensors_positive_faces = max.(dark_measurement, lux_vector_body)
+    dark_measurement = dark_condition_lux * rand(3)
+    sun_sensors_negative_faces = -min.(dark_measurement, lux_vector_body)
+    sun_sensors = [sun_sensors_positive_faces; sun_sensors_negative_faces]
+
+    return sun_sensors
+
+end
+
 function control_law(measurement)
     (state, env) = measurement
 
     dt = time_step
 
-    m = practical_detumble_control(state.angular_velocity, env.b, dt)
+    #get the lux measurement
+    lux_measurement = get_lux_measurement(state, env)
+
+    m = practical_detumble_control(state.angular_velocity, env.b, lux_measurement, dt)
     return SP.Control(
         m
     )
@@ -134,21 +176,15 @@ function slow_rotation(state, env, i)
     return norm(state.angular_velocity) < deg2rad(0.1)
 end
 
-print("entering sim")
 #@time 
-
 (data, time) = SP.simulate(control_law, max_iterations=day / time_step, dt=time_step, environment=env,
     log_init=log_init, log_step=log_step, initial_condition=x0, terminal_condition=slow_rotation, model=model, silent=false)
 
-    # 465.717581 seconds (1.48 G allocations: 94.596 GiB, 8.23% gc time, 0.02% compilation time: 82% of which was recompilation)
+# 465.717581 seconds (1.48 G allocations: 94.596 GiB, 8.23% gc time, 0.02% compilation time: 82% of which was recompilation)
 
 # Old result: ω=0.129 at 3 hours
 # New result: ω=0.156 at 3 hours
 
-
-print("size of data: ", size(data))
-
-print("data 1: ", data[1])
 down_sample_rate = 10
 
 data = data[1:down_sample_rate:end]
@@ -159,6 +195,4 @@ data = rad2deg.(data)
 detumble_plot = plot(time, data, title="DeTumbling", xlabel="Time (minutes)", ylabel="Angular Velocity (deg/s)", labels=["ω"])
 
 #save the plot
-savefig(detumble_plot, "detumble_plot.png")
-
-#display(plot(time, data, title="DeTumbling", xlabel="Time (minutes)", ylabel="Angular Velocity (deg/s)", labels=["ω"]))
+savefig(detumble_plot, "sun_controller.png")

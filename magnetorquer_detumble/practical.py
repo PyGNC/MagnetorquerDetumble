@@ -37,8 +37,9 @@ class PracticalController:
         self.mag_bias_samples = 0
         self.gyro_accumulator = np.zeros(3)
         self.bias_calibration_gyro_threshold = bias_calibration_gyro_threshold
-        self.sun_bias_accumulator = np.zeros(3)
-        self.sun_bias = np.zeros(3)
+        #ask about the sun bias
+        #self.sun_bias_accumulator = np.zeros(3)
+        #self.sun_bias = np.zeros(3)
 
         self.mag_bias_estimate_complete = False
 
@@ -115,6 +116,10 @@ class PracticalController:
         # Calculate normalized magnetic field vector
         b = magnetic_vector_body/np.linalg.norm(magnetic_vector_body)
 
+        #get this sun vector body from the lux measurements!
+        #print("lux measurements: ", self.sun_data_body)
+
+        #print("sun vector body: ", self.sun_vector_body)
         # Calculate normalized sun vector
         s = self.sun_vector_body/np.linalg.norm(self.sun_vector_body)
 
@@ -162,9 +167,9 @@ class PracticalController:
         self.mag_bias_samples += 1
         self.mag_bias[:] = self.mag_bias_accumulator / self.mag_bias_samples
 
-        if self.which_controller == 1: # sun pointing
-            self.sun_bias_accumulator += self.sun_data_body
-            self.sun_bias[:] = self.sun_bias_accumulator / self.mag_bias_samples
+        # if self.which_controller == 1: # sun pointing
+        #     self.sun_bias_accumulator += self.sun_data_body
+        #     self.sun_bias[:] = self.sun_bias_accumulator / self.mag_bias_samples
 
         self.gyro_accumulator += dt*self.gyro_data_body
         gyro_accumulator_magnitude = np.sqrt(np.dot(self.gyro_accumulator, self.gyro_accumulator))
@@ -197,8 +202,8 @@ class PracticalController:
                 # sun vector from raw lux
                 self.sun_vector_body[:] = [self.sun_data_body[i]-self.sun_data_body[i+3] for i in range(3)]
 
-                # sun data has updated - subtract bias and save it
-                self.sun_vector_body = self.sun_vector_body - self.sun_bias
+                # sun data has updated - subtract bias and save it. ask about the bias
+                self.sun_vector_body = self.sun_vector_body #- self.sun_bias
 
                 #ask Max about the sun bias. bias on the vector or lux measurements?
             else:
