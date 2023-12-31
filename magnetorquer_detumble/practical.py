@@ -13,7 +13,7 @@ class PracticalController:
     """
 
     def __init__(self, maximum_dipoles, output_range, mag_data_body, gyro_data_body, bias_calibration_gyro_threshold=6*np.pi,
-        which_controller=1): # default sun controller
+        which_controller=1,desired_spin_axis=1): # default sun controller, axis xyz 1=y
         """
         :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
         :param output_range: the maximum output values to rescale the control dipole to
@@ -47,11 +47,13 @@ class PracticalController:
         self.major_axis = np.array([0.3503, 0.9365, 0.0152])
         self.minor_axis = np.array([-0.0011, -0.0158, 0.9999])
         self.which_controller=which_controller
+        self.desired_spin_axis=desired_spin_axis
 
+    @staticmethod
     def calculate_control(maximum_dipoles, angular_rate_body, magnetic_vector_body, which_controller):
         if which_controller == 1: # sun pointing
             control_dipole = PracticalController._sun_point_control(
-                angular_rate_body, magnetic_vector_body, desired_spin_axis) # TODO which desired_spin_axis?
+                angular_rate_body, magnetic_vector_body)
         elif which_controller == 0: # detumble
             control_dipole = PracticalController._bcross_control(
                 angular_rate_body, magnetic_vector_body, 1) # k = 1 Doesn't matter, we're just saturating
@@ -80,7 +82,7 @@ class PracticalController:
         control_dipole = m
         return control_dipole
 
-    def _sun_point_control(angular_rate, magnetic_vector_body, desired_spin_axis):
+    def _sun_point_control(angular_rate, magnetic_vector_body):
 
         # Calculate normalized magnetic field vector
         b = magnetic_vector_body/np.linalg.norm(magnetic_vector_body)
@@ -92,7 +94,7 @@ class PracticalController:
 
         # Calculate body-frame angular momentum vector
         h = np.dot(self.inertia_matrix,angular_rate)
-        hd = np.linalg.norm(h)*desired_spin_axis
+        hd = np.linalg.norm(h)*self.desired_spin_axis
 
         u = np.cross(b, (1-alpha)*(hd-h) + alpha*(s*np.linalg.norm(h)-h))
 
