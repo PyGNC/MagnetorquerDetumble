@@ -17,7 +17,7 @@ class PracticalController:
         bias_calibration_gyro_threshold=6*np.pi,
         which_controller=1,spin_major_axis=1, # default sun controller, spin major axis
         inertia_ovride=None,major_minor_ovride=None, # sun pointing overrides
-        h_target=0.2*0.005,umax=50*0.1*0.1*0.1,sun_err=(0.26,0.17)): # sun pointing bounds
+        h_target=0.2*0.005,umax=1,sun_err=(0.26,0.17)): # sun pointing bounds
         """
         :param maximum_dipoles: the maximum dipole the satellite can produce, units in Am^2
         :param output_range: the maximum output values to rescale the control dipole to
@@ -52,16 +52,18 @@ class PracticalController:
             self.major_axis = np.array(major_minor_ovride[0])
             self.minor_axis = np.array(major_minor_ovride[1])
         self.which_controller=which_controller
-        # TODO confirm these are only axis options
         self.desired_spin_axis=self.major_axis if spin_major_axis else self.minor_axis
         self.h_target=h_target
+         # kept umax var (set to 1) in case we want tweak sun_point output at runtime
         self.umax=umax
         self.sun_err=sun_err
+        # external stop flag
+        self.sun_seeking = True
 
     def calculate_control(self,maximum_dipoles, angular_rate_body, magnetic_vector_body, which_controller):
         if which_controller == 1: # sun pointing
             control_dipole = self._sun_point_control(
-                angular_rate_body, magnetic_vector_body)
+                angular_rate_body, magnetic_vector_body,maximum_dipoles)
         elif which_controller == 0: # detumble
             control_dipole = self._bcross_control(
                 angular_rate_body, magnetic_vector_body, 1) # k = 1 Doesn't matter, we're just saturating
@@ -100,12 +102,16 @@ class PracticalController:
         # Calculate normalized sun vector
         s = self.sun_vector_body/np.linalg.norm(self.sun_vector_body)
 
-        if np.linalg.norm(self.desired_spin_axis - h/self.h_target) > self.sun_err[0] or np.linalg.norm(s - h/np.linalg.norm(h)) < self.sun_err[1]:
+        if np.linalg.norm(self.desired_spin_axis - h/self.h_target) > self.sun_err[0]:
             u = np.dot(skew(b),(self.desired_spin_axis-h/self.h_target))
-        else:
+        elif np.linalg.norm(s - h/np.linalg.norm(h)) > self.sun_err[1]:
             u = np.dot(skew(b),(s-h/np.linalg.norm(h)))
-        # TODO confirm with zac this isn't in leu of the scale_control_dipole
-        return self.umax*u/np.linalg.norm(u)
+        else:
+            # set flag for external stop
+            self.sun_seeking = False
+            return u = np.zeros(3)
+
+        return self.umax*maximum_dipoles*u/np.linalg.norm(u) # replace umax with max dipoles
 
 
     @staticmethod
@@ -139,11 +145,6 @@ class PracticalController:
         self.mag_bias_accumulator += self.mag_data_body
         self.mag_bias_samples += 1
         self.mag_bias[:] = self.mag_bias_accumulator / self.mag_bias_samples
-
-        # if self.which_controller == 1: # sun pointing # TODO remove?
-        #     # sun vector from raw lux
-        #     self.sun_bias_accumulator += self.sun_vector_body
-        #     self.sun_bias[:] = self.sun_bias_accumulator / self.mag_bias_samples
 
         self.gyro_accumulator += dt*self.gyro_data_body
         gyro_accumulator_magnitude = np.sqrt(np.dot(self.gyro_accumulator, self.gyro_accumulator))
