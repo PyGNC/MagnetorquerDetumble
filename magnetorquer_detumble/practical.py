@@ -113,7 +113,7 @@ class PracticalController:
             self.sun_seeking = False
             return np.zeros(3)
 
-        return self.umax*maximum_dipoles*u/np.linalg.norm(u) # replace umax with max dipoles
+        return self.umax*maximum_dipoles*u/np.linalg.norm(u)
 
 
     @staticmethod
