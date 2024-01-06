@@ -92,7 +92,7 @@ class PracticalController:
         control_dipole = m
         return control_dipole
 
-    def _sun_point_control(self, angular_rate, magnetic_vector_body):
+    def _sun_point_control(self, angular_rate, magnetic_vector_body, maximum_dipoles):
         # Calculate body-frame angular momentum vector
         h = np.dot(self.inertia_matrix,angular_rate)
 
@@ -103,13 +103,15 @@ class PracticalController:
         s = self.sun_vector_body/np.linalg.norm(self.sun_vector_body)
 
         if np.linalg.norm(self.desired_spin_axis - h/self.h_target) > self.sun_err[0]:
+            print(f'\ts1:{np.linalg.norm(self.desired_spin_axis - h/self.h_target)} > {self.sun_err[0]}') # TODO DEBUG REMOVE THIS
             u = np.dot(skew(b),(self.desired_spin_axis-h/self.h_target))
         elif np.linalg.norm(s - h/np.linalg.norm(h)) > self.sun_err[1]:
+            print(f'\ts2:{np.linalg.norm(s - h/np.linalg.norm(h))} > {self.sun_err[1]}') # TODO DEBUG REMOVE THIS
             u = np.dot(skew(b),(s-h/np.linalg.norm(h)))
         else:
             # set flag for external stop
             self.sun_seeking = False
-            return u = np.zeros(3)
+            return np.zeros(3)
 
         return self.umax*maximum_dipoles*u/np.linalg.norm(u) # replace umax with max dipoles
 
@@ -178,7 +180,7 @@ class PracticalController:
                 propagation_matrix = np.eye(3) + skew(self.gyro_data_body * dt)
                 self.sun_vector_body[:] = np.dot(
                     propagation_matrix.transpose(), self.sun_vector_body)
-                print(f'\tpropigated sun:{self.sun_vector_body.tolist()}') # TODO DEBUG REMOVE THIS
+        print(f'\tsun:{self.sun_vector_body.tolist()}, mag:{self.magnetic_vector_body}, gyr: {self.gyro_data_body}') # TODO DEBUG REMOVE THIS
 
         control = self.calculate_control(
             self.maximum_dipoles, self.gyro_data_body, self.magnetic_vector_body, self.which_controller)
